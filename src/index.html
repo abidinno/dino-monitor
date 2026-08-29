@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦖 Dino Dev Monitor & Command Center</title>
+    <link rel="icon" type="image/svg+xml" href="../assets/app-icon.svg">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="scanlines"></div>
+
+    <!-- Top App Header -->
+    <header>
+        <div class="brand">
+            <span class="brand-icon">🦖</span>
+            <span><span data-i18n="appName">DINO-MONITOR</span> <span style="font-size:10px; color:var(--text-secondary)" data-i18n="version">v1.0</span></span>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs" id="main-nav">
+            <button class="nav-tab active" data-tab="view-dashboard">
+                <span>📋</span> <span data-i18n="tabLogs">Loglar & Panel</span>
+            </button>
+            <button class="nav-tab" data-tab="view-db">
+                <span>🗄️</span> <span data-i18n="tabDb">Veritabanı Gezgini</span>
+            </button>
+            <button class="nav-tab" data-tab="view-api-tester">
+                <span>⚡</span> <span data-i18n="tabApiTester">API Test Aracı</span>
+            </button>
+            <button class="nav-tab" data-tab="view-settings">
+                <span>⚙️</span> <span data-i18n="tabSettings">Ayarlar</span>
+            </button>
+        </nav>
+
+        <!-- Status & Actions -->
+        <div class="header-actions">
+            <!-- Quick Language Switcher -->
+            <select id="quick-lang-select" class="btn-header" style="padding: 4px 6px; outline:none; font-family:var(--font-mono); cursor:pointer;">
+                <option value="tr">🇹🇷 TR</option>
+                <option value="en">🇬🇧 EN</option>
+            </select>
+
+            <div id="status-badge" class="badge-status badge-offline">
+                <span class="status-dot"></span>
+                <span id="status-text" data-i18n="statusOffline">OFFLINE</span>
+            </div>
+
+            <button id="btn-live-toggle" class="btn-header" title="Toggle Live Stream">
+                <span>🔴</span> <span id="live-text" data-i18n="streamOff">AKIS: KAPALI</span>
+            </button>
+
+            <button id="btn-pin" class="btn-header" title="Always on Top">
+                <span>📌</span> <span id="pin-text" data-i18n="pinOff">SABİTLE</span>
+            </button>
+
+            <button id="btn-connect-modal" class="btn-header" title="Reconnect / Setup">
+                <span>🔌</span> <span data-i18n="serverBtn">Sunucu</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Views -->
+    <main>
+        <!-- 0. CONNECTION / BOOT VIEW -->
+        <section id="view-connect" class="tab-view">
+            <div class="connect-terminal">
+                <div class="connect-header">
+                    <span data-i18n="terminalTitle">🦖 DINO TERMINAL BAĞLANTISI</span>
+                    <span id="boot-clock">--:--:--</span>
+                </div>
+                <div class="connect-body">
+                    <div class="boot-lines" id="boot-logs">
+                        <div class="boot-line">> Initializing Dino Monitor Subsystem...</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="serverUrlLabel">Backend Sunucu URL</label>
+                        <input type="text" id="conn-url" class="form-input" value="http://localhost:5000">
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div class="form-group">
+                            <label class="form-label" data-i18n="usernameLabel">Kullanıcı Adı</label>
+                            <input type="text" id="conn-user" class="form-input" value="abidino">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" data-i18n="passwordLabel">Şifre</label>
+                            <input type="password" id="conn-pass" class="form-input" value="devdino11">
+                        </div>
+                    </div>
+
+                    <div class="connect-buttons">
+                        <button id="btn-test-connect" class="btn-primary">
+                            <span>🚀</span> <span data-i18n="btnConnect">BAĞLAN VE DOĞRULA</span>
+                        </button>
+                        <button id="btn-quick-dev" class="btn-secondary" data-i18n="btnQuickDev">
+                            ⚡ Hızlı Geliştirici Modu
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 1. DASHBOARD & SYSTEM LOGS VIEW -->
+        <section id="view-dashboard" class="tab-view active">
+            <!-- Top Metric Cards -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <span class="metric-label" data-i18n="serverStatus">Sunucu Durumu</span>
+                    <div class="metric-value" id="m-status" style="color:var(--red)">OFFLINE</div>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label" data-i18n="serverUptime">Sunucu Çalışma Süresi</span>
+                    <div class="metric-value" id="m-uptime">--</div>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label" data-i18n="ramUsage">RAM Kullanımı (RSS)</span>
+                    <div class="metric-value" id="m-ram">--</div>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label" data-i18n="nodeRuntime">Node Çalışma Zamanı</span>
+                    <div class="metric-value" id="m-node">--</div>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label" data-i18n="totalLogCount">Toplam Log Sayısı</span>
+                    <div class="metric-value" id="m-log-count">0</div>
+                </div>
+            </div>
+
+            <!-- Dashboard Split Area (Logs & Env) -->
+            <div class="dashboard-split">
+                <!-- Left: Live Logs Console -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span>📜</span> <span data-i18n="systemLogStream">SİSTEM LOG AKIŞI</span>
+                        </div>
+                        <div class="panel-controls">
+                            <!-- Filters -->
+                            <button class="filter-btn active" data-filter="ALL" data-i18n="filterAll">HEPSİ</button>
+                            <button class="filter-btn" data-filter="HATA" style="color:var(--red)" data-i18n="filterErr">HATA</button>
+                            <button class="filter-btn" data-filter="UYARI" style="color:var(--yellow)" data-i18n="filterWarn">UYARI</button>
+                            <button class="filter-btn" data-filter="BİLGİ" style="color:var(--green)" data-i18n="filterInfo">BİLGİ</button>
+
+                            <input type="text" id="log-search" class="search-input" placeholder="🔍 Loglarda ara...">
+
+                            <button id="btn-scroll-lock" class="btn-ctrl" title="Auto-scroll toggle">⬇️ Otomatik</button>
+                            <button id="btn-refresh-logs" class="btn-ctrl">🔄</button>
+                            <button id="btn-clear-logs" class="btn-ctrl" data-i18n="clearBtn">🗑️ Temizle</button>
+                            <button id="btn-export-logs" class="btn-ctrl" data-i18n="exportBtn">💾 Dışa Aktar</button>
+                        </div>
+                    </div>
+                    <div class="log-scroll-area" id="log-list">
+                        <div style="color:var(--text-secondary); text-align:center; padding:20px;" data-i18n="waitingConn">
+                            Bağlantı bekleniyor... (Akışı başlatmak için Bağlan'a basın)
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Environment Variables & Safe Info -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span>🔒</span> <span data-i18n="safeEnvTitle">GÜVENLİ ORTAM DEĞİŞKENLERİ (ENV)</span>
+                        </div>
+                        <button id="btn-refresh-env" class="btn-ctrl">🔄</button>
+                    </div>
+                    <div class="env-container" id="env-list">
+                        <div style="color:var(--text-secondary); text-align:center; padding:20px;" data-i18n="envNotLoaded">
+                            Bilgiler yüklenmedi
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. DATABASE EXPLORER VIEW -->
+        <section id="view-db" class="tab-view">
+            <div class="panel-card" style="flex:1;">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span>🗄️</span> <span data-i18n="dbExplorerTitle">VERİTABANI TABLOLARI & METRİKLER</span>
+                    </div>
+                    <div class="panel-controls">
+                        <input type="text" id="db-search" class="search-input" placeholder="Tablolarda ara...">
+                        <button id="btn-refresh-db" class="btn-ctrl" data-i18n="refreshDbBtn">🔄 DB Yenile</button>
+                    </div>
+                </div>
+
+                <!-- DB Tabs (Main & Secondary) -->
+                <div class="db-tabs">
+                    <div class="db-tab active" data-dbtab="main" data-i18n="mainDbTab">ANA VERİTABANI</div>
+                    <div class="db-tab" data-dbtab="ext" id="tab-db-ext" style="display:none;" data-i18n="secondaryDbTab">İKİNCİL VERİTABANI</div>
+                </div>
+
+                <div class="table-wrapper">
+                    <!-- Main Table -->
+                    <table class="data-table" id="table-db-main">
+                        <thead>
+                            <tr>
+                                <th data-i18n="colTableName">TABLO ADI</th>
+                                <th data-i18n="colRowCount">SATIR SAYISI</th>
+                                <th data-i18n="colDataSize">VERİ BOYUTU</th>
+                                <th data-i18n="colIndexSize">İNDEKS BOYUTU</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-main"></tbody>
+                    </table>
+
+                    <!-- Secondary Table -->
+                    <table class="data-table" id="table-db-ext" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th data-i18n="colTableName">TABLO ADI</th>
+                                <th data-i18n="colRowCount">SATIR SAYISI</th>
+                                <th data-i18n="colDataSize">VERİ BOYUTU</th>
+                                <th data-i18n="colIndexSize">İNDEKS BOYUTU</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-ext"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. API TESTER (POSTMAN-LITE) VIEW -->
+        <section id="view-api-tester" class="tab-view">
+            <div class="url-bar-container">
+                <select id="req-method" class="method-select">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="PATCH">PATCH</option>
+                </select>
+
+                <input type="text" id="req-url" class="url-input" placeholder="http://localhost:5000/api/..." value="http://localhost:5000/api/dino-logs/data">
+
+                <button id="btn-send-req" class="btn-send">
+                    <span>⚡</span> <span id="send-text" data-i18n="btnSend">GÖNDER (Ctrl+Enter)</span>
+                </button>
+            </div>
+
+            <!-- Quick Presets -->
+            <div style="display:flex; gap:8px; align-items:center; font-size:11px; color:var(--text-secondary);">
+                <span data-i18n="quickPresets">Hızlı Şablonlar:</span>
+                <button class="filter-btn btn-preset" data-method="POST" data-url="/api/dino-logs/data" data-body='{"u":"abidino","p":"devdino11"}' data-i18n="presetLogsData">Dino Log Verisi</button>
+                <button class="filter-btn btn-preset" data-method="GET" data-url="/api/dino-logs" data-body='' data-i18n="presetLogsStatus">Dino Log Durumu</button>
+                <button class="filter-btn btn-preset" data-method="GET" data-url="/" data-body='' data-i18n="presetApiRoot">API Kök Dizin</button>
+            </div>
+
+            <div class="api-tester-container">
+                <!-- Left: Request Configuration -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <div class="req-editor-tabs">
+                            <button class="req-tab active" data-reqtab="body" data-i18n="reqBodyTab">İstek Gövdesi (JSON)</button>
+                            <button class="req-tab" data-reqtab="headers" data-i18n="reqHeadersTab">Başlıklar (Headers)</button>
+                        </div>
+                        <button id="btn-format-json" class="btn-ctrl" data-i18n="btnFormatJson">✨ JSON Düzenle</button>
+                    </div>
+
+                    <div style="flex:1; padding:8px;">
+                        <textarea id="req-body" class="code-textarea" placeholder='{\n  "key": "value"\n}'></textarea>
+                    </div>
+                </div>
+
+                <!-- Right: Response Viewer -->
+                <div class="panel-card">
+                    <div class="response-status-bar">
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <span id="res-status-badge" class="res-tag res-tag-success">200 OK</span>
+                            <span id="res-time" class="res-time">0 ms</span>
+                            <span id="res-size" class="res-time">0 B</span>
+                        </div>
+                        <button id="btn-copy-res" class="btn-ctrl" data-i18n="btnCopyResponse">📋 Yanıtı Kopyala</button>
+                    </div>
+
+                    <div class="res-body-container" id="res-output">// Response will appear here...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. SETTINGS VIEW -->
+        <section id="view-settings" class="tab-view">
+            <div class="settings-card">
+                <h3 style="color:var(--orange); font-family:var(--font-mono)" data-i18n="settingsTitle">⚙️ Dino Monitor Tercihleri</h3>
+                
+                <div class="form-group">
+                    <label class="form-label" data-i18n="languageLabel">Uygulama Dili / Language</label>
+                    <select id="setting-language" class="form-input">
+                        <option value="tr">Türkçe (TR)</option>
+                        <option value="en">English (EN)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" data-i18n="defaultUrlLabel">Varsayılan Backend URL</label>
+                    <input type="text" id="setting-url" class="form-input" value="http://localhost:5000">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" data-i18n="pollingIntervalLabel">Canlı Akış Yoklama Sıklığı</label>
+                    <select id="setting-interval" class="form-input">
+                        <option value="1000" data-i18n="interval1s">1 Saniye (Çok Hızlı)</option>
+                        <option value="2000" selected data-i18n="interval2s">2 Saniye (Önerilen)</option>
+                        <option value="5000" data-i18n="interval5s">5 Saniye (Hafif)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" data-i18n="autoConnectLabel">Başlangıçta Otomatik Bağlan</label>
+                    <select id="setting-autoconnect" class="form-input">
+                        <option value="true" selected data-i18n="optEnabled">Etkin</option>
+                        <option value="false" data-i18n="optDisabled">Devre Dışı</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" data-i18n="notificationsLabel">Windows Bildirimleri (Toast)</label>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <select id="setting-notifications" class="form-input" style="flex:1;">
+                            <option value="ALL" selected data-i18n="notifAll">Hatalar ve Uyarılar</option>
+                            <option value="ERROR" data-i18n="notifErrorsOnly">Sadece Kritik Hatalar</option>
+                            <option value="OFF" data-i18n="notifDisabled">Devre Dışı</option>
+                        </select>
+                        <button id="btn-test-notif" type="button" class="btn-ctrl" style="white-space:nowrap; padding:6px 12px;" data-i18n="btnTestNotif">
+                            🔔 Test Bildirimi Gönder
+                        </button>
+                    </div>
+                </div>
+
+                <button id="btn-save-settings" class="btn-primary" style="margin-top:10px;">
+                    <span data-i18n="btnSaveSettings">💾 Tercihleri Kaydet</span>
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <script src="i18n.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

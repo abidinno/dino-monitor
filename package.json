@@ -1,0 +1,51 @@
+{
+  "name": "dino-monitor",
+  "version": "1.1.0",
+  "description": "Dino Backend Service & Log Monitor Desktop Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder",
+    "build:portable": "electron-builder --win portable",
+    "build:setup": "electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.dino.monitor",
+    "productName": "Dino Dev Monitor",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**/*",
+      "src/**/*"
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "keywords": [
+    "electron",
+    "dino",
+    "monitor",
+    "logs",
+    "developer-tools"
+  ],
+  "author": "abidino",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}
