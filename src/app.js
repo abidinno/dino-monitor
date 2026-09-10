@@ -5,6 +5,21 @@ const state = {
     url: localStorage.getItem('dino_url') || 'http://localhost:5000',
     user: localStorage.getItem('dino_user') || 'abidino',
     pass: localStorage.getItem('dino_pass') || 'devdino11',
+
+    // SSH Live Mode State
+    connMode: localStorage.getItem('dino_conn_mode') || 'ssh', // 'ssh' or 'http'
+    sshHost: localStorage.getItem('dino_ssh_host') || '213.238.180.211',
+    sshPort: localStorage.getItem('dino_ssh_port') || '22',
+    sshUser: localStorage.getItem('dino_ssh_user') || 'root',
+    sshPass: localStorage.getItem('dino_ssh_pass') || '',
+    sshRemember: localStorage.getItem('dino_ssh_remember') !== 'false',
+    sshAutoReconnect: localStorage.getItem('dino_ssh_auto_reconnect') !== 'false',
+    sshIsConnected: false,
+    sshSelectedTarget: 'all',
+    pm2List: [],
+    reconnectCountdown: 5,
+    reconnectTimer: null,
+
     liveMode: false,
     pollIntervalMs: parseInt(localStorage.getItem('dino_interval')) || 2000,
     pollTimer: null,
@@ -42,7 +57,38 @@ const elements = {
     pinText: document.getElementById('pin-text'),
     btnConnectModal: document.getElementById('btn-connect-modal'),
 
-    // Boot / Connection
+    // Boot / Connection - Mode & Subforms
+    tabModeSsh: document.getElementById('tab-mode-ssh'),
+    tabModeHttp: document.getElementById('tab-mode-http'),
+    formSshConnect: document.getElementById('form-ssh-connect'),
+    formHttpConnect: document.getElementById('form-http-connect'),
+
+    // SSH Inputs
+    sshHost: document.getElementById('ssh-host'),
+    sshPort: document.getElementById('ssh-port'),
+    sshUser: document.getElementById('ssh-user'),
+    sshPass: document.getElementById('ssh-pass'),
+    btnToggleSshEye: document.getElementById('btn-toggle-ssh-eye'),
+    sshRemember: document.getElementById('ssh-remember'),
+    sshAutoReconnect: document.getElementById('ssh-auto-reconnect'),
+    btnSshConnect: document.getElementById('btn-ssh-connect'),
+    btnQuickSshDev: document.getElementById('btn-quick-ssh-dev'),
+
+    // PM2 Site Selector
+    sshSiteControls: document.getElementById('ssh-site-controls'),
+    sshSiteSelect: document.getElementById('ssh-site-select'),
+    btnRefreshPm2: document.getElementById('btn-refresh-pm2'),
+
+    // SSH Reconnect Modal
+    sshReconnectModal: document.getElementById('ssh-reconnect-modal'),
+    reconnectModalTitle: document.getElementById('reconnect-modal-title'),
+    sshDisconnectReason: document.getElementById('ssh-disconnect-reason'),
+    sshCountdownBox: document.getElementById('ssh-countdown-box'),
+    sshCountdownTimer: document.getElementById('ssh-countdown-timer'),
+    btnModalReconnectNow: document.getElementById('btn-modal-reconnect-now'),
+    btnModalCancel: document.getElementById('btn-modal-cancel'),
+
+    // Boot / Connection - HTTP
     connUrl: document.getElementById('conn-url'),
     connUser: document.getElementById('conn-user'),
     connPass: document.getElementById('conn-pass'),
@@ -134,13 +180,20 @@ window.addEventListener('DOMContentLoaded', () => {
     initClock();
     loadPreferences();
     setupEventListeners();
+    setupSshListeners();
     setLanguage(state.lang);
+    setConnectionMode(state.connMode);
 
     appendBootLog(t('bootReady'));
-    appendBootLog(`${t('bootTarget')} ${state.url}`);
-    
-    // Test initial connection
-    testConnection(false);
+    if (state.connMode === 'ssh') {
+        appendBootLog(`${t('bootTarget')} SSH [${state.sshUser}@${state.sshHost}:${state.sshPort}]`);
+        if (state.sshPass) {
+            connectSsh(false);
+        }
+    } else {
+        appendBootLog(`${t('bootTarget')} HTTP [${state.url}]`);
+        testConnection(false);
+    }
 });
 
 function initClock() {
@@ -151,6 +204,15 @@ function initClock() {
 }
 
 function loadPreferences() {
+    // SSH Inputs
+    if (elements.sshHost) elements.sshHost.value = state.sshHost;
+    if (elements.sshPort) elements.sshPort.value = state.sshPort;
+    if (elements.sshUser) elements.sshUser.value = state.sshUser;
+    if (elements.sshPass) elements.sshPass.value = state.sshPass;
+    if (elements.sshRemember) elements.sshRemember.checked = state.sshRemember;
+    if (elements.sshAutoReconnect) elements.sshAutoReconnect.checked = state.sshAutoReconnect;
+
+    // HTTP Inputs
     elements.connUrl.value = state.url;
     elements.connUser.value = state.user;
     elements.connPass.value = state.pass;
@@ -207,10 +269,46 @@ function setupEventListeners() {
         elements.pinText.innerText = state.isPinned ? t('pinOn') : t('pinOff');
     });
 
-    // Live Stream Toggle
+    // Live Stream Toggle (HTTP Mode)
     elements.btnLiveToggle.addEventListener('click', toggleLiveStream);
 
-    // Boot / Connection
+    // Mode Switcher (SSH vs HTTP)
+    if (elements.tabModeSsh) {
+        elements.tabModeSsh.addEventListener('click', () => setConnectionMode('ssh'));
+    }
+    if (elements.tabModeHttp) {
+        elements.tabModeHttp.addEventListener('click', () => setConnectionMode('http'));
+    }
+
+    // SSH Controls
+    if (elements.btnToggleSshEye) {
+        elements.btnToggleSshEye.addEventListener('click', toggleSshPassVisibility);
+    }
+    if (elements.btnQuickSshDev) {
+        elements.btnQuickSshDev.addEventListener('click', fillQuickSshInfo);
+    }
+    if (elements.btnSshConnect) {
+        elements.btnSshConnect.addEventListener('click', () => connectSsh(false));
+    }
+    if (elements.sshSiteSelect) {
+        elements.sshSiteSelect.addEventListener('change', (e) => startSshLogStream(e.target.value));
+    }
+    if (elements.btnRefreshPm2) {
+        elements.btnRefreshPm2.addEventListener('click', () => refreshPm2List());
+    }
+
+    // Reconnect Modal Controls
+    if (elements.btnModalReconnectNow) {
+        elements.btnModalReconnectNow.addEventListener('click', () => {
+            hideReconnectModal();
+            connectSsh(true);
+        });
+    }
+    if (elements.btnModalCancel) {
+        elements.btnModalCancel.addEventListener('click', () => hideReconnectModal());
+    }
+
+    // Boot / Connection - HTTP
     elements.btnTestConnect.addEventListener('click', () => testConnection(true));
     elements.btnQuickDev.addEventListener('click', () => {
         elements.connUrl.value = 'http://localhost:5000';
@@ -240,10 +338,18 @@ function setupEventListeners() {
         elements.btnScrollLock.classList.toggle('active', state.autoScroll);
     });
 
-    elements.btnRefreshLogs.addEventListener('click', fetchServerData);
+    elements.btnRefreshLogs.addEventListener('click', () => {
+        if (state.connMode === 'ssh') {
+            refreshPm2List();
+            renderLogs();
+        } else {
+            fetchServerData();
+        }
+    });
     elements.btnRefreshEnv.addEventListener('click', fetchServerData);
     elements.btnClearLogs.addEventListener('click', () => {
         state.currentLogs = [];
+        elements.mLogCount.innerText = '0';
         renderLogs();
     });
 
@@ -341,6 +447,247 @@ function appendBootLog(text) {
     div.innerText = text;
     elements.bootLogs.appendChild(div);
     elements.bootLogs.scrollTop = elements.bootLogs.scrollHeight;
+}
+
+// ─── SSH & PM2 Live Stream Management ──────────────────────────────────────────
+function setConnectionMode(mode) {
+    state.connMode = mode;
+    localStorage.setItem('dino_conn_mode', mode);
+
+    if (mode === 'ssh') {
+        if (elements.tabModeSsh) elements.tabModeSsh.classList.add('active');
+        if (elements.tabModeHttp) elements.tabModeHttp.classList.remove('active');
+        if (elements.formSshConnect) elements.formSshConnect.style.display = 'block';
+        if (elements.formHttpConnect) elements.formHttpConnect.style.display = 'none';
+        if (elements.sshSiteControls) elements.sshSiteControls.style.display = 'flex';
+    } else {
+        if (elements.tabModeHttp) elements.tabModeHttp.classList.add('active');
+        if (elements.tabModeSsh) elements.tabModeSsh.classList.remove('active');
+        if (elements.formHttpConnect) elements.formHttpConnect.style.display = 'block';
+        if (elements.formSshConnect) elements.formSshConnect.style.display = 'none';
+        if (elements.sshSiteControls) elements.sshSiteControls.style.display = 'none';
+    }
+}
+
+function toggleSshPassVisibility() {
+    if (!elements.sshPass) return;
+    const isPass = elements.sshPass.type === 'password';
+    elements.sshPass.type = isPass ? 'text' : 'password';
+    if (elements.btnToggleSshEye) {
+        elements.btnToggleSshEye.innerText = isPass ? '🙈' : '👁️';
+    }
+}
+
+function fillQuickSshInfo() {
+    if (elements.sshHost) elements.sshHost.value = '213.238.180.211';
+    if (elements.sshPort) elements.sshPort.value = '22';
+    if (elements.sshUser) elements.sshUser.value = 'root';
+    if (elements.sshPass) elements.sshPass.focus();
+}
+
+async function connectSsh(isReconnect = false) {
+    if (elements.sshHost) state.sshHost = elements.sshHost.value.trim();
+    if (elements.sshPort) state.sshPort = parseInt(elements.sshPort.value.trim()) || 22;
+    if (elements.sshUser) state.sshUser = elements.sshUser.value.trim();
+    if (elements.sshPass) state.sshPass = elements.sshPass.value;
+    if (elements.sshRemember) state.sshRemember = elements.sshRemember.checked;
+    if (elements.sshAutoReconnect) state.sshAutoReconnect = elements.sshAutoReconnect.checked;
+
+    if (state.sshRemember) {
+        localStorage.setItem('dino_ssh_host', state.sshHost);
+        localStorage.setItem('dino_ssh_port', state.sshPort);
+        localStorage.setItem('dino_ssh_user', state.sshUser);
+        localStorage.setItem('dino_ssh_pass', state.sshPass);
+        localStorage.setItem('dino_ssh_remember', 'true');
+    } else {
+        localStorage.removeItem('dino_ssh_pass');
+        localStorage.setItem('dino_ssh_remember', 'false');
+    }
+    localStorage.setItem('dino_ssh_auto_reconnect', state.sshAutoReconnect ? 'true' : 'false');
+
+    if (!state.sshHost || !state.sshUser) {
+        alert('Lütfen Host ve Kullanıcı adı girin.');
+        return;
+    }
+
+    if (elements.btnSshConnect) elements.btnSshConnect.disabled = true;
+    appendBootLog(`${t('sshConnecting')} ${state.sshUser}@${state.sshHost}:${state.sshPort}...`);
+
+    try {
+        if (!window.electronAPI || !window.electronAPI.sshConnect) {
+            throw new Error('Electron SSH API bulunamadı');
+        }
+
+        const res = await window.electronAPI.sshConnect({
+            host: state.sshHost,
+            port: state.sshPort,
+            username: state.sshUser,
+            password: state.sshPass
+        });
+
+        if (res.success) {
+            state.sshIsConnected = true;
+            setOnlineStatus(true);
+            appendBootLog(t('sshConnected'));
+
+            if (isReconnect) {
+                hideReconnectModal();
+                if (window.electronAPI.showNotification) {
+                    window.electronAPI.showNotification({
+                        title: '🦖 Dino Dev Monitor',
+                        body: t('sshReconnected')
+                    });
+                }
+                // Retain existing logs, just append reconnect marker
+                state.currentLogs.push(`[${new Date().toLocaleTimeString()}] === 🔄 ${t('sshReconnected')} ===`);
+                renderLogs();
+            } else {
+                setTimeout(() => switchTab('view-dashboard'), 400);
+            }
+
+            await refreshPm2List();
+            await startSshLogStream(state.sshSelectedTarget || 'all');
+        } else {
+            state.sshIsConnected = false;
+            setOnlineStatus(false);
+            appendBootLog(`❌ [SSH FAIL] ${res.error || 'Bağlantı kurulamadı'}`);
+            if (!isReconnect) {
+                alert(`SSH Bağlantı Hatası: ${res.error || 'Bilinmeyen hata'}`);
+            }
+        }
+    } catch (err) {
+        state.sshIsConnected = false;
+        setOnlineStatus(false);
+        appendBootLog(`❌ [SSH ERROR] ${err.message}`);
+        if (!isReconnect) {
+            alert(`SSH Hatası: ${err.message}`);
+        }
+    } finally {
+        if (elements.btnSshConnect) elements.btnSshConnect.disabled = false;
+    }
+}
+
+async function refreshPm2List() {
+    if (!state.sshIsConnected || !window.electronAPI || !window.electronAPI.sshGetPm2List) return;
+    try {
+        const res = await window.electronAPI.sshGetPm2List();
+        if (res.success && Array.isArray(res.list)) {
+            state.pm2List = res.list;
+            renderPm2Dropdown(res.list);
+        } else if (res.error) {
+            appendBootLog(`⚠️ [PM2] ${res.error}`);
+        }
+    } catch (err) {
+        console.error('PM2 list fetch error:', err);
+    }
+}
+
+function renderPm2Dropdown(list) {
+    const select = elements.sshSiteSelect;
+    if (!select) return;
+    const currentVal = state.sshSelectedTarget;
+    select.innerHTML = `<option value="all">${t('pm2AllSites')}</option>`;
+
+    list.forEach(proc => {
+        const opt = document.createElement('option');
+        opt.value = proc.name;
+        const statusSymbol = proc.status === 'online' ? '🟢' : '🔴';
+        opt.innerText = `${statusSymbol} ${proc.name} (id:${proc.id} | ${proc.memory}MB)`;
+        select.appendChild(opt);
+    });
+
+    select.value = currentVal;
+}
+
+async function startSshLogStream(target = 'all') {
+    if (!state.sshIsConnected || !window.electronAPI || !window.electronAPI.sshStreamLogs) return;
+    try {
+        state.sshSelectedTarget = target;
+        appendBootLog(`${t('sshStreamStarted')} ${target}`);
+        await window.electronAPI.sshStreamLogs({ target, lines: 50 });
+    } catch (err) {
+        console.error('Stream logs error:', err);
+    }
+}
+
+function showReconnectModal(reason = '') {
+    if (!elements.sshReconnectModal) return;
+    if (elements.sshDisconnectReason) {
+        elements.sshDisconnectReason.innerText = reason 
+            ? `${t('modalSshDesc')} [${reason}]`
+            : t('modalSshDesc');
+    }
+
+    elements.sshReconnectModal.style.display = 'flex';
+
+    if (state.sshAutoReconnect) {
+        if (elements.sshCountdownBox) elements.sshCountdownBox.style.display = 'flex';
+        state.reconnectCountdown = 5;
+        if (elements.sshCountdownTimer) elements.sshCountdownTimer.innerText = `${state.reconnectCountdown}s`;
+
+        if (state.reconnectTimer) clearInterval(state.reconnectTimer);
+        state.reconnectTimer = setInterval(() => {
+            state.reconnectCountdown--;
+            if (elements.sshCountdownTimer) elements.sshCountdownTimer.innerText = `${state.reconnectCountdown}s`;
+            if (state.reconnectCountdown <= 0) {
+                clearInterval(state.reconnectTimer);
+                state.reconnectTimer = null;
+                connectSsh(true);
+            }
+        }, 1000);
+    } else {
+        if (elements.sshCountdownBox) elements.sshCountdownBox.style.display = 'none';
+    }
+}
+
+function hideReconnectModal() {
+    if (state.reconnectTimer) {
+        clearInterval(state.reconnectTimer);
+        state.reconnectTimer = null;
+    }
+    if (elements.sshReconnectModal) {
+        elements.sshReconnectModal.style.display = 'none';
+    }
+}
+
+function setupSshListeners() {
+    if (!window.electronAPI) return;
+
+    if (window.electronAPI.onSshLogChunk) {
+        window.electronAPI.onSshLogChunk((data) => {
+            if (!data) return;
+            const text = data.text || data.chunk || '';
+            const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+            if (lines.length > 0) {
+                state.currentLogs.push(...lines);
+                if (state.currentLogs.length > 2000) {
+                    state.currentLogs = state.currentLogs.slice(-2000);
+                }
+                elements.mLogCount.innerText = state.currentLogs.length;
+                renderLogs();
+                processLogNotifications(lines);
+            }
+        });
+    }
+
+    if (window.electronAPI.onSshStatus) {
+        window.electronAPI.onSshStatus((statusData) => {
+            if (statusData.status === 'closed' || statusData.status === 'ended' || statusData.status === 'error') {
+                const wasConnected = state.sshIsConnected;
+                state.sshIsConnected = false;
+                setOnlineStatus(false);
+                appendBootLog(`⚠️ ${t('sshDisconnectedNotice')} (${statusData.error || statusData.status})`);
+
+                if (state.connMode === 'ssh' && wasConnected) {
+                    showReconnectModal(statusData.error || statusData.status);
+                }
+            } else if (statusData.status === 'ready') {
+                state.sshIsConnected = true;
+                setOnlineStatus(true);
+                hideReconnectModal();
+            }
+        });
+    }
 }
 
 // --- Connection & Data Fetching ---
@@ -508,7 +855,17 @@ function renderLogs() {
 
     // Filter by Level
     if (state.filterLevel !== 'ALL') {
-        logs = logs.filter(l => l.includes(`[${state.filterLevel}]`));
+        logs = logs.filter(l => {
+            const up = l.toUpperCase();
+            if (state.filterLevel === 'HATA') {
+                return up.includes('[HATA]') || up.includes('[ERROR]') || up.includes('ERR') || up.includes('EXCEPTION') || up.includes('FAIL');
+            } else if (state.filterLevel === 'UYARI') {
+                return up.includes('[UYARI]') || up.includes('[WARN]') || up.includes('WARNING');
+            } else if (state.filterLevel === 'BİLGİ') {
+                return up.includes('[BİLGİ]') || up.includes('[INFO]') || up.includes('INFO:');
+            }
+            return up.includes(state.filterLevel);
+        });
     }
 
     // Filter by Search Term
@@ -523,9 +880,16 @@ function renderLogs() {
 
     elements.logList.innerHTML = logs.map(log => {
         let color = 'var(--text-primary)';
-        if (log.includes('[HATA]')) color = 'var(--red)';
-        else if (log.includes('[UYARI]')) color = 'var(--yellow)';
-        else if (log.includes('[BİLGİ]')) color = '#79c0ff';
+        const up = log.toUpperCase();
+        if (up.includes('[HATA]') || up.includes('[ERROR]') || up.includes('CRITICAL') || up.includes('TYPEERROR') || up.includes('EXCEPTION')) {
+            color = 'var(--red)';
+        } else if (up.includes('[UYARI]') || up.includes('[WARN]') || up.includes('WARNING')) {
+            color = 'var(--yellow)';
+        } else if (up.includes('[BİLGİ]') || up.includes('[INFO]')) {
+            color = '#79c0ff';
+        } else if (log.includes('=== 🔄') || up.includes('CONNECTED') || up.includes('[SSH OK]')) {
+            color = 'var(--green)';
+        }
 
         return `
             <div class="log-item">

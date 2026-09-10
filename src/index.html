@@ -74,29 +74,90 @@
                         <div class="boot-line">> Initializing Dino Monitor Subsystem...</div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label" data-i18n="serverUrlLabel">Backend Sunucu URL</label>
-                        <input type="text" id="conn-url" class="form-input" value="http://localhost:5000">
+                    <!-- Connection Mode Switcher -->
+                    <div class="conn-mode-switcher">
+                        <button type="button" id="tab-mode-ssh" class="btn-mode active">
+                            <span>🔐</span> <span data-i18n="modeSshLive">Canlı SSH Modu (PM2 Logları)</span>
+                        </button>
+                        <button type="button" id="tab-mode-http" class="btn-mode">
+                            <span>🌐</span> <span data-i18n="modeHttpApi">HTTP API Modu</span>
+                        </button>
                     </div>
 
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                        <div class="form-group">
-                            <label class="form-label" data-i18n="usernameLabel">Kullanıcı Adı</label>
-                            <input type="text" id="conn-user" class="form-input" value="abidino">
+                    <!-- 1. SSH LIVE STREAM FORM (Default) -->
+                    <div id="form-ssh-connect" class="conn-subform active">
+                        <div style="display:grid; grid-template-columns: 3fr 1fr; gap:10px;">
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="sshHostLabel">Sunucu IP / Host</label>
+                                <input type="text" id="ssh-host" class="form-input" value="213.238.180.211" placeholder="213.238.180.211">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="sshPortLabel">SSH Port</label>
+                                <input type="number" id="ssh-port" class="form-input" value="22">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label" data-i18n="passwordLabel">Şifre</label>
-                            <input type="password" id="conn-pass" class="form-input" value="devdino11">
+
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="sshUserLabel">SSH Kullanıcısı</label>
+                                <input type="text" id="ssh-user" class="form-input" value="root">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="sshPassLabel">SSH Şifresi</label>
+                                <div style="position:relative; display:flex; align-items:center;">
+                                    <input type="password" id="ssh-pass" class="form-input" placeholder="Sunucu root şifresi" style="padding-right:34px;">
+                                    <button type="button" id="btn-toggle-ssh-eye" style="position:absolute; right:8px; background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:14px;">👁️</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:12px; color:var(--text-secondary);">
+                            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <input type="checkbox" id="ssh-remember" checked>
+                                <span data-i18n="sshRemember">Şifreyi ve Bilgileri Hatırla</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <input type="checkbox" id="ssh-auto-reconnect" checked>
+                                <span data-i18n="sshAutoReconnect">Koparsa Otomatik Yeniden Bağlan</span>
+                            </label>
+                        </div>
+
+                        <div class="connect-buttons">
+                            <button type="button" id="btn-ssh-connect" class="btn-primary">
+                                <span>🚀</span> <span data-i18n="btnSshConnect">SSH İLE BAĞLAN VE LOGLARI BAŞLAT</span>
+                            </button>
+                            <button type="button" id="btn-quick-ssh-dev" class="btn-secondary" data-i18n="btnQuickSsh">
+                                ⚡ Hızlı Sunucu Bilgisini Yükle
+                            </button>
                         </div>
                     </div>
 
-                    <div class="connect-buttons">
-                        <button id="btn-test-connect" class="btn-primary">
-                            <span>🚀</span> <span data-i18n="btnConnect">BAĞLAN VE DOĞRULA</span>
-                        </button>
-                        <button id="btn-quick-dev" class="btn-secondary" data-i18n="btnQuickDev">
-                            ⚡ Hızlı Geliştirici Modu
-                        </button>
+                    <!-- 2. HTTP REST API FORM (Legacy / Local Dev) -->
+                    <div id="form-http-connect" class="conn-subform" style="display:none;">
+                        <div class="form-group">
+                            <label class="form-label" data-i18n="serverUrlLabel">Backend Sunucu URL</label>
+                            <input type="text" id="conn-url" class="form-input" value="http://localhost:5000">
+                        </div>
+
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="usernameLabel">Kullanıcı Adı</label>
+                                <input type="text" id="conn-user" class="form-input" value="abidino">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="passwordLabel">Şifre</label>
+                                <input type="password" id="conn-pass" class="form-input" value="devdino11">
+                            </div>
+                        </div>
+
+                        <div class="connect-buttons">
+                            <button type="button" id="btn-test-connect" class="btn-primary">
+                                <span>🚀</span> <span data-i18n="btnConnect">BAĞLAN VE DOĞRULA</span>
+                            </button>
+                            <button type="button" id="btn-quick-dev" class="btn-secondary" data-i18n="btnQuickDev">
+                                ⚡ Hızlı Geliştirici Modu
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -137,6 +198,15 @@
                             <span>📜</span> <span data-i18n="systemLogStream">SİSTEM LOG AKIŞI</span>
                         </div>
                         <div class="panel-controls">
+                            <!-- SSH PM2 Site Selector (Only visible in SSH Mode) -->
+                            <div id="ssh-site-controls" style="display:none; align-items:center; gap:6px; margin-right:4px;">
+                                <span style="font-size:11px; color:var(--orange); font-family:var(--font-mono); font-weight:bold;">PM2:</span>
+                                <select id="ssh-site-select" class="form-input" style="padding:3px 8px; font-size:11px; width:auto; min-width:145px; height:28px;">
+                                    <option value="all">🌐 Tüm Siteler (PM2)</option>
+                                </select>
+                                <button type="button" id="btn-refresh-pm2" class="btn-ctrl" title="PM2 Sitelerini Yenile">🔄</button>
+                            </div>
+
                             <!-- Filters -->
                             <button class="filter-btn active" data-filter="ALL" data-i18n="filterAll">HEPSİ</button>
                             <button class="filter-btn" data-filter="HATA" style="color:var(--red)" data-i18n="filterErr">HATA</button>
@@ -337,6 +407,36 @@
             </div>
         </section>
     </main>
+
+    <!-- SSH Disconnect & Reconnect Popup Modal -->
+    <div id="ssh-reconnect-modal" class="modal-backdrop" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-icon">⚠️</span>
+                <h3 id="reconnect-modal-title" data-i18n="modalSshTitle">SSH Oturumu Sonlandı</h3>
+            </div>
+            <div class="modal-body">
+                <p id="ssh-disconnect-reason" style="margin-bottom:12px; color:var(--text-primary); font-size:13px;" data-i18n="modalSshDesc">
+                    Sunucuyla olan SSH oturumu kapandı (bağlantı koptu veya zaman aşımı).
+                </p>
+                <div class="reconnect-box" id="ssh-countdown-box">
+                    <span data-i18n="modalAutoReconnect">Otomatik yeniden bağlanılıyor:</span>
+                    <span id="ssh-countdown-timer" class="countdown-badge">5s</span>
+                </div>
+                <p style="font-size:11px; color:var(--text-secondary); margin-top:10px;" data-i18n="modalLogsPreserved">
+                    💡 Ekrandaki mevcut loglarınız korundu, yeni loglar kaldığı yerden devam edecektir.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btn-modal-reconnect-now" class="btn-primary">
+                    <span>🚀</span> <span data-i18n="btnModalReconnectNow">Hemen Yeniden Bağlan</span>
+                </button>
+                <button type="button" id="btn-modal-cancel" class="btn-secondary">
+                    <span>❌</span> <span data-i18n="btnModalCancel">Vazgeç / Durdur</span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="i18n.js"></script>
     <script src="app.js"></script>
