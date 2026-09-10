@@ -8,7 +8,7 @@ const state = {
 
     // SSH Live Mode State
     connMode: localStorage.getItem('dino_conn_mode') || 'ssh', // 'ssh' or 'http'
-    sshHost: localStorage.getItem('dino_ssh_host') || '213.238.180.211',
+    sshHost: localStorage.getItem('dino_ssh_host') || '',
     sshPort: localStorage.getItem('dino_ssh_port') || '22',
     sshUser: localStorage.getItem('dino_ssh_user') || 'root',
     sshPass: localStorage.getItem('dino_ssh_pass') || '',
@@ -479,10 +479,10 @@ function toggleSshPassVisibility() {
 }
 
 function fillQuickSshInfo() {
-    if (elements.sshHost) elements.sshHost.value = '213.238.180.211';
     if (elements.sshPort) elements.sshPort.value = '22';
     if (elements.sshUser) elements.sshUser.value = 'root';
-    if (elements.sshPass) elements.sshPass.focus();
+    if (elements.sshHost && !elements.sshHost.value) elements.sshHost.focus();
+    else if (elements.sshPass) elements.sshPass.focus();
 }
 
 async function connectSsh(isReconnect = false) {
